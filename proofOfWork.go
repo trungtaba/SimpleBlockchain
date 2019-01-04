@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -25,7 +24,7 @@ func (pow *ProofOfWork) prepareData(nonce int) []byte {
 	data := bytes.Join(
 		[][]byte{
 			pow.block.PrevBlockHash,
-			pow.block.Data,
+			pow.block.HashTransactions(),
 			[]byte(strconv.Itoa(nonce)),
 		},
 		[]byte{},
@@ -39,7 +38,6 @@ func (pow *ProofOfWork) Run() (int, []byte) {
 	nonce := 0
 	var hash [32]byte
 
-	fmt.Printf("Mining the block containing \"%s\"\n", pow.block.Data)
 	for true {
 		data := pow.prepareData(nonce)
 		hash = sha256.Sum256(data)
