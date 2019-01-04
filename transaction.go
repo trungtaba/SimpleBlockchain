@@ -22,25 +22,36 @@ type Transaction struct {
 	PubKey    []byte
 }
 
+type HashTransaction struct {
+	Timestamp int64
+	From      string
+	To        string
+	Value     int
+}
+
 const subsidy = 10
+
+func (tx *Transaction) createHashTransaction() HashTransaction {
+	return HashTransaction{tx.Timestamp, tx.From, tx.To, tx.Value}
+}
 
 // Hash returns the hash of the Transaction
 func (tx *Transaction) Hash() []byte {
 	var hash [32]byte
 
-	tx.ID = []byte{}
+	hashTransaction := tx.createHashTransaction()
 
-	hash = sha256.Sum256(tx.Serialize())
+	hash = sha256.Sum256(hashTransaction.Serialize())
 
 	return hash[:]
 }
 
 // Serialize returns a serialized Transaction
-func (tx Transaction) Serialize() []byte {
+func (htx *HashTransaction) Serialize() []byte {
 	var encoded bytes.Buffer
 
 	enc := gob.NewEncoder(&encoded)
-	err := enc.Encode(tx)
+	err := enc.Encode(htx)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -48,8 +59,8 @@ func (tx Transaction) Serialize() []byte {
 	return encoded.Bytes()
 }
 
-// Sign signs each input of a Transaction
-func (tx *Transaction) Sign(privKey ecdsa.PrivateKey) {
+// SignTransaction signs each input of a Transaction
+func (tx *Transaction) SignTransaction(privKey ecdsa.PrivateKey) {
 	if tx.IsCoinbase() {
 		return
 	}
@@ -59,11 +70,14 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey) {
 	// pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-4]
 	// tx.PubKey = pubKeyHash
 
-	tx.PubKey = getPublicKey(privKey)
+	tx.PubKey = GetPublicKey(privKey)
 
 	tx.ID = tx.Hash()
 
 	r, s, err := ecdsa.Sign(rand.Reader, &privKey, tx.ID)
+	if err != nil {
+		log.Panic(err)
+	}
 	signature := append(r.Bytes(), s.Bytes()...)
 	tx.Signature = signature
 }
@@ -112,7 +126,7 @@ func NewTransaction(from, to string, amount int, bc *Blockchain) *Transaction {
 	}
 	tx := Transaction{nil, time.Now().Unix(), from, to, amount, []byte{}, []byte{}}
 	tx.ID = tx.Hash()
-	bc.SignTransaction(&tx, fromWallet.PrivateKey)
+	tx.SignTransaction(fromWallet.PrivateKey)
 	//update from wallet
 	fromWallet.BlockAmount(amount)
 	toWallet := wallets.GetWallet(to)

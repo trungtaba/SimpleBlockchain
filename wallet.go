@@ -6,6 +6,8 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"fmt"
+	"log"
 
 	"golang.org/x/crypto/ripemd160"
 )
@@ -29,16 +31,19 @@ func NewWallet() *Wallet {
 	return &wallet
 }
 
-// GetAddress returns wallet address
 func newKeyPair() (ecdsa.PrivateKey, []byte) {
 	curve := elliptic.P256()
 	private, err := ecdsa.GenerateKey(curve, rand.Reader)
-	public := getPublicKey(*private)
+	if err != nil {
+		log.Panic(err)
+	}
+	public := GetPublicKey(*private)
 
 	return *private, public
 }
 
-func getPublicKey(privateKey ecdsa.PrivateKey) []byte {
+//GetPublicKey return publicKey from private key
+func GetPublicKey(privateKey ecdsa.PrivateKey) []byte {
 	public := append(privateKey.PublicKey.X.Bytes(), privateKey.PublicKey.Y.Bytes()...)
 	return public
 }
@@ -61,6 +66,9 @@ func HashPubKey(pubKey []byte) []byte {
 
 	RIPEMD160Hasher := ripemd160.New()
 	_, err := RIPEMD160Hasher.Write(publicSHA256[:])
+	if err != nil {
+		log.Panic(err)
+	}
 	publicRIPEMD160 := RIPEMD160Hasher.Sum(nil)
 
 	return publicRIPEMD160
@@ -85,11 +93,29 @@ func ValidateAddress(address string) bool {
 	return bytes.Compare(actualChecksum, targetChecksum) == 0
 }
 
-func (wl *Wallet) getSpendable() int {
-	return wl.balance + wl.blocked
+//getSpendable get amount avaiable
+func (w *Wallet) getSpendable() int {
+	return w.balance + w.blocked
 }
 
-func (wl *Wallet) BlockAmount(amount int) bool {
-	wl.blocked -= amount
+//BlockAmount block amount
+func (w *Wallet) BlockAmount(amount int) bool {
+	w.blocked -= amount
 	return true
 }
+
+//Send send fund
+func (w *Wallet) Send(to string, amount int, bc *Blockchain) {
+	avaiable := w.getSpendable()
+	if avaiable < amount {
+		log.Panic("ERROR: Not enough funds")
+	}
+	from := fmt.Sprintf("%s", w.GetAddress())
+	NewTransaction(from, to, amount, bc)
+}
+
+// func GetpubKeyHash(privKey ecdsa.PrivateKey) []byte {
+// 	address:=
+// 	pubKeyHash := Base58Decode(address)
+// 	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-4]
+// }
